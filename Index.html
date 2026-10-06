@@ -1,1 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image to PDF Converter</title>
+  <!-- jsPDF via unpkg for higher mobile/webview compatibility -->
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- heic2any for converting HEIC/HEIF on mobile -->
+  <script src="https://unpkg.com/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #fafafa;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: #eff6ff;
+    }
+
+    .dropzone svg {
+      width: 48px;
+      height: 48px;
+      stroke: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .dropzone p {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .dropzone span {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: block;
+      margin-top: 0.25rem;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .preview-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .preview-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: #f8fafc;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .preview-item img {
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #eee;
+    }
+
+    .preview-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .preview-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .preview-size {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .status-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 3px;
+    }
+
+    .btn-remove {
+      background: transparent;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      padding: 0.4rem;
+      border-radius: 6px;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-remove:hover {
+      background: #fee2e2;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    button.primary {
+      flex: 1;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button.primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    button.secondary:hover {
+      background: #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Universal Image to PDF Converter</h1>
+    <p>Convert JPG, JPEG, PNG, WEBP, and iPhone HEIC/HEIF to PDF.</p>
+  </header>
+
+  <div class="card">
+    <div class="dropzone" id="dropzone">
+      <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+      </svg>
+      <p>Drag & drop images here, or browse</p>
+      <span>Supports JPG, JPEG, PNG, WEBP, HEIC, HEIF</span>
+      <input type="file" id="fileInput" multiple accept="image/*,.heic,.heif" />
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="pageSize">Page Size</label>
+        <select id="pageSize">
+          <option value="a4">A4 (Standard)</option>
+          <option value="letter">Letter</option>
+          <option value="fit">Fit to Image Size</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="orientation">Orientation</label>
+        <select id="orientation">
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="fileName">Output Filename</label>
+        <input type="text" id="fileName" value="converted_images.pdf" />
+      </div>
+    </div>
+
+    <div class="preview-list" id="previewList"></div>
+
+    <div class="actions">
+      <button class="secondary" id="clearBtn" style="display: none;">Clear All</button>
+      <button class="primary" id="convertBtn" disabled>Generate & Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const fileInput = document.getElementById("fileInput");
+  const dropzone = document.getElementById("dropzone");
+  const previewList = document.getElementById("previewList");
+  const convertBtn = document.getElementById("convertBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const pageSizeSelect = document.getElementById("pageSize");
+  const orientationSelect = document.getElementById("orientation");
+  const fileNameInput = document.getElementById("fileName");
+
+  let filesStore = [];
+
+  dropzone.addEventListener("click", () => fileInput.click());
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
+
+  async function handleFiles(files) {
+    if (!files || files.length === 0) return;
+
+    for (let file of Array.from(files)) {
+      const isHeic = file.name.toLowerCase().endsWith(".heic") || 
+                     file.name.toLowerCase().endsWith(".heif") || 
+                     file.type === "image/heic" || 
+                     file.type === "image/heif";
+
+      if (isHeic) {
+        try {
+          // Convert HEIC blob to a JPEG blob using heic2any
+          const convertedBlob = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.9
+          });
+
+          const normalizedBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+          const convertedFile = new File([normalizedBlob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), {
+            type: "image/jpeg"
+          });
+
+          filesStore.push({
+            name: file.name,
+            size: convertedFile.size,
+            url: URL.createObjectURL(convertedFile),
+            format: "JPEG"
+          });
+        } catch (err) {
+          console.error("HEIC conversion failed:", err);
+          alert(`Failed to decode HEIC file: ${file.name}.`);
+        }
+      } else {
+        // Standard formats: PNG, JPG, JPEG, WEBP, etc.
+        const ext = file.name.split('.').pop().toLowerCase();
+        let format = "JPEG";
+        if (ext === "png" || file.type === "image/png") format = "PNG";
+        else if (ext === "webp" || file.type === "image/webp") format = "WEBP";
+
+        filesStore.push({
+          name: file.name,
+          size: file.size,
+          url: URL.createObjectURL(file),
+          format: format
+        });
+      }
+    }
+    renderPreviews();
+  }
+
+  function renderPreviews() {
+    previewList.innerHTML = "";
+    filesStore.forEach((item, index) => {
+      const el = document.createElement("div");
+      el.className = "preview-item";
+      el.innerHTML = `
+        <img src="${item.url}" alt="${item.name}" />
+        <div class="preview-info">
+          <div class="preview-name">${item.name}</div>
+          <div class="preview-size">${(item.size / 1024).toFixed(1)} KB</div>
+          <span class="status-badge">${item.format}</span>
+        </div>
+        <button class="btn-remove" title="Remove" onclick="removeItem(${index})">&times;</button>
+      `;
+      previewList.appendChild(el);
+    });
+
+    const hasFiles = filesStore.length > 0;
+    convertBtn.disabled = !hasFiles;
+    clearBtn.style.display = hasFiles ? "inline-block" : "none";
+  }
+
+  window.removeItem = function(index) {
+    URL.revokeObjectURL(filesStore[index].url);
+    filesStore.splice(index, 1);
+    renderPreviews();
+  };
+
+  clearBtn.addEventListener("click", () => {
+    filesStore.forEach(item => URL.revokeObjectURL(item.url));
+    filesStore = [];
+    fileInput.value = "";
+    renderPreviews();
+  });
+
+  function loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = (err) => reject(err);
+      img.src = url;
+    });
+  }
+
+  convertBtn.addEventListener("click", async () => {
+    if (filesStore.length === 0) return;
+
+    convertBtn.disabled = true;
+    convertBtn.textContent = "Processing PDF...";
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const pageFormat = pageSizeSelect.value;
+      const orientation = orientationSelect.value;
+
+      let doc;
+      const firstImg = await loadImage(filesStore[0].url);
+
+      if (pageFormat === "fit") {
+        doc = new jsPDF({
+          orientation: firstImg.naturalWidth > firstImg.naturalHeight ? "l" : "p",
+          unit: "px",
+          format: [firstImg.naturalWidth, firstImg.naturalHeight]
+        });
+      } else {
+        doc = new jsPDF({
+          orientation: orientation === "landscape" ? "l" : "p",
+          unit: "mm",
+          format: pageFormat
+        });
+      }
+
+      for (let i = 0; i < filesStore.length; i++) {
+        const item = filesStore[i];
+        const img = await loadImage(item.url);
+        const imgWidth = img.naturalWidth || img.width;
+        const imgHeight = img.naturalHeight || img.height;
+
+        if (i > 0) {
+          if (pageFormat === "fit") {
+            doc.addPage([imgWidth, imgHeight], imgWidth > imgHeight ? "l" : "p");
+          } else {
+            doc.addPage(pageFormat, orientation === "landscape" ? "l" : "p");
+          }
+        }
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        if (pageFormat === "fit") {
+          doc.addImage(img, item.format, 0, 0, pageWidth, pageHeight, undefined, "FAST");
+        } else {
+          const margin = 10; // 10mm margins
+          const maxW = pageWidth - margin * 2;
+          const maxH = pageHeight - margin * 2;
+
+          const ratio = Math.min(maxW / imgWidth, maxH / imgHeight);
+          const renderW = imgWidth * ratio;
+          const renderH = imgHeight * ratio;
+          const posX = margin + (maxW - renderW) / 2;
+          const posY = margin + (maxH - renderH) / 2;
+
+          doc.addImage(img, item.format, posX, posY, renderW, renderH, undefined, "FAST");
+        }
+      }
+
+      let saveName = fileNameInput.value.trim() || "document.pdf";
+      if (!saveName.toLowerCase().endsWith(".pdf")) saveName += ".pdf";
+
+      doc.save(saveName);
+    } catch (error) {
+      console.error(error);
+      alert("Error generating PDF. Make sure your browser has memory access and script execution enabled.");
+    } finally {
+      convertBtn.disabled = false;
+      convertBtn.textContent = "Generate & Download PDF";
+    }
+  });
+</script>
+</body>
+</html>
+
 
